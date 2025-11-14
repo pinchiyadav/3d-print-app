@@ -1,16 +1,17 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   Timestamp,
   updateDoc,
   doc,
   addDoc,
-  collection
+  collection,
+  getDoc
 } from 'firebase/firestore';
 import {
   sendPasswordResetEmail
 } from 'firebase/auth';
 import { auth, db, getOrdersCollectionPath, getRedeemRequestsCollectionPath, getManualAdjustmentsCollectionPath } from '../firebase.config';
-import { Modal, InfoGroup, InfoItem, SuccessMessage, ErrorMessage, Input, TextArea, Select } from './UI';
+import { Modal, InfoGroup, InfoItem, SuccessMessage, ErrorMessage, Input, TextArea, Select, StatusBadge, LoadingScreen } from './UI';
 import { DownloadIcon } from './Icons';
 
 function OrderModal({ order, onClose, isAdmin, setError }) {
