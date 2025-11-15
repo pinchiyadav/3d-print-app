@@ -10,7 +10,7 @@ import {
 import {
   sendPasswordResetEmail
 } from 'firebase/auth';
-import { auth, db, getOrdersCollectionPath, getRedeemRequestsCollectionPath, getManualAdjustmentsCollectionPath } from '../firebase.config';
+import { auth, db, getOrdersCollectionPath, getRedeemRequestsCollectionPath, getManualAdjustmentsCollectionPath, getUsersCollectionPath } from '../firebase.config';
 import { Modal, InfoGroup, InfoItem, SuccessMessage, ErrorMessage, Input, TextArea, Select, StatusBadge, LoadingScreen } from './UI';
 import { DownloadIcon } from './Icons';
 
@@ -226,9 +226,9 @@ function RedeemModal({ request, onClose, adminUser, setError }) {
             <InfoItem label="Amount Requested" value={`₹${request.amount.toLocaleString('en-IN')}`} />
           </InfoGroup>
           
-          {photographer?.bankDetails ? (
+          {photographer?.bankDetails && photographer.bankDetails.accountNumber && photographer.bankDetails.ifsc ? (
             <InfoGroup title="Bank Details">
-              <InfoItem label="Account Name" value={photographer.bankDetails.accountName} />
+              <InfoItem label="Account Name" value={photographer.bankDetails.accountName || 'N/A'} />
               <InfoItem label="Account Number" value={photographer.bankDetails.accountNumber} />
               <InfoItem label="IFSC Code" value={photographer.bankDetails.ifsc} />
             </InfoGroup>
@@ -253,7 +253,7 @@ function RedeemModal({ request, onClose, adminUser, setError }) {
             <div className="flex gap-4">
               <button
                 onClick={() => handleAction('paid')}
-                disabled={actionLoading || !photographer?.bankDetails}
+                disabled={actionLoading || !photographer?.bankDetails?.accountNumber || !photographer?.bankDetails?.ifsc}
                 className="w-full py-3 px-4 bg-green-600 text-white font-bold rounded-lg shadow-md hover:bg-green-700 transition-colors disabled:opacity-50"
               >
                 {actionLoading ? 'Processing...' : 'Mark as Paid'}
@@ -281,72 +281,6 @@ function AdminUserModal({ photographer, onClose, adminUser, setError }) {
   const [message, setMessage] = useState('');
   const [adjAmount, setAdjAmount] = useState('');
   const [adjRemarks, setAdjRemarks] = useState('');
-  
-  const [userData, setUserData] = useState({
-    displayName: photographer.displayName,
-    email: photographer.email,
-    bankDetails: photographer.bankDetails || { accountName: '', accountNumber: '', ifsc: '' }
-  });
-  
-  const handleUserChange = (e) => {
-    const { id, value } = e.target;
-    setUserData(prev => ({ ...prev, [id]: value }));
-  };
-  
-  const handleBankChange = (e) => {
-    const { id, value } = e.target;
-    setUserData(prev => ({
-      ...prev,
-      bankDetails: {
-        ...prev.bankDetails,
-        [id]: value
-      }
-    }));
-  };
-  
-  const handleSaveUserDetails = async (e) => {
-    e.preventDefault();
-    setLoading(true);
-    setError('');
-    setMessage('');
-    
-    try {
-      const userDocRef = doc(db, getUsersCollectionPath(), photographer.uid);
-      await updateDoc(userDocRef, {
-        displayName: userData.displayName,
-        email: userData.email, // Note: This only changes Firestore, not Firebase Auth
-        bankDetails: userData.bankDetails
-      });
-      
-      if (userData.email !== photographer.email) {
-        setMessage('User details saved. Email in Firebase Auth was not changed. User must still log in with old email.');
-      } else {
-        setMessage('User details saved successfully.');
-      }
-    } catch (err) {
-      console.error(err);
-      setError("Failed to save user details.");
-    }
-    setLoading(false);
-  };
-  
-  const handleResetPassword = async () => {
-    if (!window.confirm(`Send password reset email to ${photographer.email}?`)) return;
-    
-    setLoading(true);
-    setError('');
-    setMessage('');
-    
-    try {
-      await sendPasswordResetEmail(auth, photographer.email);
-      setMessage('Password reset email sent successfully.');
-    } catch (err) {
-      console.error(err);
-      setError(`Failed to send email: ${err.message}`);
-    }
-    setLoading(false);
-  };
-
 
   const handleSubmitAdjustment = async (e) => {
     e.preventDefault();
@@ -386,66 +320,15 @@ function AdminUserModal({ photographer, onClose, adminUser, setError }) {
   };
   
   return (
-    <Modal onClose={onClose} title={`Edit User: ${photographer.photographerPId}`}>
+    <Modal onClose={onClose} title={`Adjust Earnings: ${photographer.photographerPId}`}>
       <div className="space-y-6">
         {message && <SuccessMessage message={message} onClose={() => setMessage('')} />}
         
-        <form onSubmit={handleSaveUserDetails} className="space-y-4">
-          <InfoGroup title="Edit User Info">
-            <Input 
-              id="displayName"
-              label="Full Name"
-              value={userData.displayName}
-              onChange={handleUserChange}
-            />
-            <Input 
-              id="email"
-              label="Email (Auth login email won't change)"
-              type="email"
-              value={userData.email}
-              onChange={handleUserChange}
-            />
-          </InfoGroup>
-          
-          <InfoGroup title="Edit Bank Details">
-            <Input
-              id="accountName"
-              label="Bank Account Holder Name"
-              value={userData.bankDetails.accountName}
-              onChange={handleBankChange}
-            />
-            <Input
-              id="accountNumber"
-              label="Bank Account Number"
-              value={userData.bankDetails.accountNumber}
-              onChange={handleBankChange}
-            />
-            <Input
-              id="ifsc"
-              label="IFSC Code"
-              value={userData.bankDetails.ifsc}
-              onChange={handleBankChange}
-            />
-          </InfoGroup>
-          
-          <div className="flex gap-4">
-            <button
-              type="submit"
-              disabled={loading}
-              className="w-full py-3 px-4 bg-blue-600 text-white font-bold rounded-lg shadow-md hover:bg-blue-700 transition-colors disabled:opacity-50"
-            >
-              {loading ? 'Saving...' : 'Save User Details'}
-            </button>
-            <button
-              type="button"
-              onClick={handleResetPassword}
-              disabled={loading}
-              className="w-full py-3 px-4 bg-yellow-500 text-white font-bold rounded-lg shadow-md hover:bg-yellow-600 transition-colors disabled:opacity-50"
-            >
-              {loading ? '...' : 'Send Password Reset'}
-            </button>
-          </div>
-        </form>
+        <InfoGroup title="User Info">
+          <InfoItem label="Name" value={photographer.displayName} />
+          <InfoItem label="UserID" value={photographer.photographerId} />
+          <InfoItem label="Email" value={photographer.email} />
+        </InfoGroup>
         
         <InfoGroup title="Manual Earnings Adjustment">
           <form onSubmit={handleSubmitAdjustment} className="space-y-4">

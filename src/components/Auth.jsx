@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import {
   createUserWithEmailAndPassword,
   signInWithEmailAndPassword,
+  sendPasswordResetEmail,
   updateProfile
 } from 'firebase/auth';
 import {
@@ -17,6 +18,10 @@ export function LoginPage({ setPage, setError, error }) {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [loading, setLoading] = useState(false);
+  const [showForgotPassword, setShowForgotPassword] = useState(false);
+  const [resetEmail, setResetEmail] = useState('');
+  const [resetLoading, setResetLoading] = useState(false);
+  const [resetMessage, setResetMessage] = useState('');
 
   const handleLogin = async (e) => {
     e.preventDefault();
@@ -30,6 +35,68 @@ export function LoginPage({ setPage, setError, error }) {
     setLoading(false);
   };
 
+  const handleForgotPassword = async (e) => {
+    e.preventDefault();
+    if (!resetEmail) {
+      setResetMessage('Please enter your email address.');
+      return;
+    }
+    
+    setResetLoading(true);
+    setResetMessage('');
+    
+    try {
+      await sendPasswordResetEmail(auth, resetEmail);
+      setResetMessage('Password reset email sent! Check your inbox.');
+      setResetEmail('');
+    } catch (error) {
+      setResetMessage(`Error: ${error.message}`);
+    }
+    setResetLoading(false);
+  };
+
+  if (showForgotPassword) {
+    return (
+      <AuthForm
+        title="Reset Password"
+        subtitle="Enter your email to receive a reset link"
+        onSubmit={handleForgotPassword}
+        loading={resetLoading}
+        error=""
+        submitText="Send Reset Email"
+        footer={
+          <p className="text-sm text-slate-600">
+            Remember your password?{' '}
+            <button
+              type="button"
+              onClick={() => {
+                setShowForgotPassword(false);
+                setResetMessage('');
+              }}
+              className="font-medium text-blue-600 hover:text-blue-500"
+            >
+              Back to Login
+            </button>
+          </p>
+        }
+      >
+        {resetMessage && (
+          <div className={`p-3 rounded-lg text-sm ${resetMessage.startsWith('Error') ? 'bg-red-100 text-red-700' : 'bg-green-100 text-green-700'}`}>
+            {resetMessage}
+          </div>
+        )}
+        <Input
+          id="resetEmail"
+          type="email"
+          label="Email Address"
+          value={resetEmail}
+          onChange={(e) => setResetEmail(e.target.value)}
+          required
+        />
+      </AuthForm>
+    );
+  }
+
   return (
     <AuthForm
       title="Welcome Back!"
@@ -39,16 +106,27 @@ export function LoginPage({ setPage, setError, error }) {
       error={error}
       submitText="Login"
       footer={
-        <p className="text-sm text-slate-600">
-          Don't have an account?{' '}
-          <button
-            type="button"
-            onClick={() => setPage('signup')}
-            className="font-medium text-blue-600 hover:text-blue-500"
-          >
-            Create one
-          </button>
-        </p>
+        <div className="space-y-2">
+          <p className="text-sm text-slate-600">
+            <button
+              type="button"
+              onClick={() => setShowForgotPassword(true)}
+              className="font-medium text-blue-600 hover:text-blue-500"
+            >
+              Forgot Password?
+            </button>
+          </p>
+          <p className="text-sm text-slate-600">
+            Don't have an account?{' '}
+            <button
+              type="button"
+              onClick={() => setPage('signup')}
+              className="font-medium text-blue-600 hover:text-blue-500"
+            >
+              Create one
+            </button>
+          </p>
+        </div>
       }
     >
       <Input
@@ -74,6 +152,7 @@ export function LoginPage({ setPage, setError, error }) {
 export function SignUpPage({ setPage, setError, error, fetchPhotographerData }) {
   const [name, setName] = useState('');
   const [email, setEmail] = useState('');
+  const [phoneNumber, setPhoneNumber] = useState('');
   const [password, setPassword] = useState('');
   const [loading, setLoading] = useState(false);
 
@@ -84,6 +163,12 @@ export function SignUpPage({ setPage, setError, error, fetchPhotographerData }) 
     
     if (name.length < 4) {
       setError("Full name must be at least 4 characters long.");
+      setLoading(false);
+      return;
+    }
+    
+    if (!phoneNumber || phoneNumber.length < 10) {
+      setError("Please enter a valid phone number (minimum 10 digits).");
       setLoading(false);
       return;
     }
@@ -119,6 +204,7 @@ export function SignUpPage({ setPage, setError, error, fetchPhotographerData }) 
         photographerId: newPhotographerId,
         displayName: name,
         email: authUser.email,
+        phoneNumber: phoneNumber,
         createdAt: Timestamp.now(),
         orderCounter: 0,
         bankDetails: {
@@ -162,6 +248,14 @@ export function SignUpPage({ setPage, setError, error, fetchPhotographerData }) 
         label="Full Name (min. 4 characters)"
         value={name}
         onChange={(e) => setName(e.target.value)}
+        required
+      />
+      <Input
+        id="phoneNumber"
+        type="tel"
+        label="Phone Number"
+        value={phoneNumber}
+        onChange={(e) => setPhoneNumber(e.target.value)}
         required
       />
       <Input

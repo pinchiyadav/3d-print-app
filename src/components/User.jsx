@@ -14,7 +14,8 @@ import {
 import {
   reauthenticateWithCredential,
   EmailAuthProvider,
-  updatePassword
+  updatePassword,
+  getAuth
 } from 'firebase/auth';
 import {
   ref,
@@ -475,6 +476,8 @@ function PreviousOrdersPage({ user, photographer, setModal }) {
   const [loading, setLoading] = useState(true);
   const [models, setModels] = useState([]);
   const [modelFilter, setModelFilter] = useState('all');
+  const [currentPage, setCurrentPage] = useState(1);
+  const [ordersPerPage] = useState(20);
   
   useEffect(() => {
     if (!photographer?.uid) return;
@@ -511,8 +514,14 @@ function PreviousOrdersPage({ user, photographer, setModal }) {
       newFilteredOrders = newFilteredOrders.filter(o => o.modelId === modelFilter);
     }
     setFilteredOrders(newFilteredOrders);
+    setCurrentPage(1);
   }, [orders, modelFilter]);
 
+  // Pagination
+  const indexOfLastOrder = currentPage * ordersPerPage;
+  const indexOfFirstOrder = indexOfLastOrder - ordersPerPage;
+  const currentOrders = filteredOrders.slice(indexOfFirstOrder, indexOfLastOrder);
+  const totalPages = Math.ceil(filteredOrders.length / ordersPerPage);
 
   if (loading) {
     return <LoadingScreen />;
@@ -538,40 +547,70 @@ function PreviousOrdersPage({ user, photographer, setModal }) {
       {filteredOrders.length === 0 ? (
         <p className="text-slate-500">You haven't placed any orders yet{modelFilter !== 'all' && ' for this model'}.</p>
       ) : (
-        <div className="overflow-x-auto rounded-lg border border-slate-200">
-          <table className="min-w-full divide-y divide-slate-200">
-            <thead className="bg-slate-50">
-              <tr>
-                <Th>Order ID</Th>
-                <Th>Model</Th>
-                <Th>Buyer Name</Th>
-                <Th>Date</Th>
-                <Th>Status</Th>
-                <Th>Admin Comments</Th>
-              </tr>
-            </thead>
-            <tbody className="bg-white divide-y divide-slate-200">
-              {filteredOrders.map(order => (
-                <tr 
-                  key={order.id}
-                  onClick={() => setModal({ type: 'order', data: order })}
-                  className="cursor-pointer hover:bg-slate-50 transition-colors"
-                >
-                  <Td>{order.orderId}</Td>
-                  <Td>{order.modelName || 'N/A'}</Td>
-                  <Td>{order.buyerName}</Td>
-                  <Td>{new Date(order.createdAt.seconds * 1000).toLocaleDateString()}</Td>
-                  <Td>
-                    <StatusBadge status={order.status} />
-                  </Td>
-                  <Td>
-                    <span className="truncate block w-48">{order.adminComments || '-'}</span>
-                  </Td>
+        <>
+          <div className="overflow-x-auto rounded-lg border border-slate-200">
+            <table className="min-w-full divide-y divide-slate-200">
+              <thead className="bg-slate-50">
+                <tr>
+                  <Th>Order ID</Th>
+                  <Th>Model</Th>
+                  <Th>Buyer Name</Th>
+                  <Th>Date</Th>
+                  <Th>Status</Th>
+                  <Th>Admin Comments</Th>
                 </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
+              </thead>
+              <tbody className="bg-white divide-y divide-slate-200">
+                {currentOrders.map(order => (
+                  <tr 
+                    key={order.id}
+                    onClick={() => setModal({ type: 'order', data: order })}
+                    className="cursor-pointer hover:bg-slate-50 transition-colors"
+                  >
+                    <Td>{order.orderId}</Td>
+                    <Td>{order.modelName || 'N/A'}</Td>
+                    <Td>{order.buyerName}</Td>
+                    <Td>{new Date(order.createdAt.seconds * 1000).toLocaleDateString()}</Td>
+                    <Td>
+                      <StatusBadge status={order.status} />
+                    </Td>
+                    <Td>
+                      <span className="truncate block w-48">{order.adminComments || '-'}</span>
+                    </Td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+          
+          {/* Pagination */}
+          {totalPages > 1 && (
+            <div className="flex justify-between items-center mt-4">
+              <p className="text-sm text-slate-600">
+                Showing {indexOfFirstOrder + 1} to {Math.min(indexOfLastOrder, filteredOrders.length)} of {filteredOrders.length} orders
+              </p>
+              <div className="flex gap-2">
+                <button
+                  onClick={() => setCurrentPage(prev => Math.max(prev - 1, 1))}
+                  disabled={currentPage === 1}
+                  className="px-3 py-1 bg-slate-200 text-slate-700 rounded hover:bg-slate-300 disabled:opacity-50 disabled:cursor-not-allowed"
+                >
+                  Previous
+                </button>
+                <span className="px-3 py-1 text-slate-700">
+                  Page {currentPage} of {totalPages}
+                </span>
+                <button
+                  onClick={() => setCurrentPage(prev => Math.min(prev + 1, totalPages))}
+                  disabled={currentPage === totalPages}
+                  className="px-3 py-1 bg-slate-200 text-slate-700 rounded hover:bg-slate-300 disabled:opacity-50 disabled:cursor-not-allowed"
+                >
+                  Next
+                </button>
+              </div>
+            </div>
+          )}
+        </>
       )}
     </div>
   );
@@ -585,11 +624,38 @@ function ProfilePage({ user, photographer, setPhotographer, setError }) {
   const [bankLoading, setBankLoading] = useState(false);
   const [bankMessage, setBankMessage] = useState('');
   
+  const [phoneNumber, setPhoneNumber] = useState(photographer.phoneNumber || '');
+  const [phoneLoading, setPhoneLoading] = useState(false);
+  const [phoneMessage, setPhoneMessage] = useState('');
+  
   const [oldPassword, setOldPassword] = useState('');
   const [newPassword, setNewPassword] = useState('');
   const [passLoading, setPassLoading] = useState(false);
   const [passMessage, setPassMessage] = useState('');
   const [passError, setPassError] = useState('');
+
+  const handlePhoneSave = async (e) => {
+    e.preventDefault();
+    if (!phoneNumber || phoneNumber.length < 10) {
+      setError("Please enter a valid phone number (minimum 10 digits).");
+      return;
+    }
+    
+    setPhoneLoading(true);
+    setPhoneMessage('');
+    setError('');
+    
+    try {
+      const userDocRef = doc(db, getUsersCollectionPath(), photographer.uid);
+      await updateDoc(userDocRef, { phoneNumber });
+      setPhotographer(prev => ({ ...prev, phoneNumber }));
+      setPhoneMessage('Phone number updated successfully!');
+    } catch (err) {
+      console.error(err);
+      setError('Failed to update phone number. Please try again.');
+    }
+    setPhoneLoading(false);
+  };
 
   const handleBankSave = async (e) => {
     e.preventDefault();
@@ -670,6 +736,30 @@ function ProfilePage({ user, photographer, setPhotographer, setError }) {
             disabled
           />
         </div>
+      </div>
+      
+      <div className="bg-white p-8 rounded-xl shadow-lg">
+        <h2 className="text-xl font-semibold text-slate-800 mb-4">
+          Phone Number
+        </h2>
+        {phoneMessage && <SuccessMessage message={phoneMessage} onClose={() => setPhoneMessage('')} />}
+        <form onSubmit={handlePhoneSave} className="space-y-6">
+          <Input
+            id="phoneNumber"
+            label="Phone Number"
+            type="tel"
+            value={phoneNumber}
+            onChange={(e) => setPhoneNumber(e.target.value)}
+            required
+          />
+          <button
+            type="submit"
+            disabled={phoneLoading}
+            className="w-full py-3 px-4 bg-blue-600 text-white font-bold rounded-lg shadow-md hover:bg-blue-700 transition-colors disabled:opacity-50"
+          >
+            {phoneLoading ? 'Saving...' : 'Update Phone Number'}
+          </button>
+        </form>
       </div>
       
       <div className="bg-white p-8 rounded-xl shadow-lg">
@@ -868,30 +958,32 @@ function EarningStatementPage({ user, photographer }) {
       {ledger.length === 0 ? (
         <p className="text-slate-500">No transactions found yet.</p>
       ) : (
-        <div className="overflow-x-auto rounded-lg border border-slate-200">
-          <table className="min-w-full divide-y divide-slate-200">
-            <thead className="bg-slate-50">
-              <tr>
-                <Th>Date</Th>
-                <Th>Description</Th>
-                <Th>Type</Th>
-                <Th>Amount</Th>
-              </tr>
-            </thead>
-            <tbody className="bg-white divide-y divide-slate-200">
-              {ledger.map(item => (
-                <tr key={item.id}>
-                  <Td>{new Date(item.date.seconds * 1000).toLocaleDateString()}</Td>
-                  <Td>{item.description}</Td>
-                  <Td><StatusBadge status={item.type.toLowerCase()} /></Td>
-                  <Td className={item.amount > 0 ? 'text-green-600' : 'text-red-600'}>
-                    {item.amount > 0 ? '+' : ''}₹{item.amount.toLocaleString('en-IN')}
-                  </Td>
+        <>
+          <div className="overflow-x-auto rounded-lg border border-slate-200">
+            <table className="min-w-full divide-y divide-slate-200">
+              <thead className="bg-slate-50">
+                <tr>
+                  <Th>Date</Th>
+                  <Th>Description</Th>
+                  <Th>Type</Th>
+                  <Th>Amount</Th>
                 </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
+              </thead>
+              <tbody className="bg-white divide-y divide-slate-200">
+                {ledger.map(item => (
+                  <tr key={item.id}>
+                    <Td>{new Date(item.date.seconds * 1000).toLocaleDateString()}</Td>
+                    <Td>{item.description}</Td>
+                    <Td><StatusBadge status={item.type.toLowerCase()} /></Td>
+                    <Td className={item.amount > 0 ? 'text-green-600' : 'text-red-600'}>
+                      {item.amount > 0 ? '+' : ''}₹{item.amount.toLocaleString('en-IN')}
+                    </Td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </>
       )}
     </div>
   );
@@ -904,6 +996,8 @@ function EarningStatementPage({ user, photographer }) {
 function RedeemHistoryPage({ user, photographer }) {
   const [requests, setRequests] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [currentPage, setCurrentPage] = useState(1);
+  const [requestsPerPage] = useState(20);
 
   useEffect(() => {
     if (!photographer?.uid) return;
@@ -926,6 +1020,12 @@ function RedeemHistoryPage({ user, photographer }) {
     return () => unsubscribe();
   }, [photographer?.uid]);
 
+  // Pagination
+  const indexOfLastRequest = currentPage * requestsPerPage;
+  const indexOfFirstRequest = indexOfLastRequest - requestsPerPage;
+  const currentRequests = requests.slice(indexOfFirstRequest, indexOfLastRequest);
+  const totalPages = Math.ceil(requests.length / requestsPerPage);
+
   if (loading) return <LoadingScreen />;
 
   return (
@@ -934,30 +1034,60 @@ function RedeemHistoryPage({ user, photographer }) {
       {requests.length === 0 ? (
         <p className="text-slate-500">You haven't made any redeem requests yet.</p>
       ) : (
-        <div className="overflow-x-auto rounded-lg border border-slate-200">
-          <table className="min-w-full divide-y divide-slate-200">
-            <thead className="bg-slate-50">
-              <tr>
-                <Th>Date Requested</Th>
-                <Th>Amount Requested</Th>
-                <Th>Status</Th>
-                <Th>Amount Paid</Th>
-                <Th>Admin Remarks</Th>
-              </tr>
-            </thead>
-            <tbody className="bg-white divide-y divide-slate-200">
-              {requests.map(req => (
-                <tr key={req.id}>
-                  <Td>{new Date(req.requestedAt.seconds * 1000).toLocaleDateString()}</Td>
-                  <Td>₹{req.amount.toLocaleString('en-IN')}</Td>
-                  <Td><StatusBadge status={req.status} /></Td>
-                  <Td>{req.amountPaid ? `₹${req.amountPaid.toLocaleString('en-IN')}` : '-'}</Td>
-                  <Td>{req.remarks || '-'}</Td>
+        <>
+          <div className="overflow-x-auto rounded-lg border border-slate-200">
+            <table className="min-w-full divide-y divide-slate-200">
+              <thead className="bg-slate-50">
+                <tr>
+                  <Th>Date Requested</Th>
+                  <Th>Amount Requested</Th>
+                  <Th>Status</Th>
+                  <Th>Amount Paid</Th>
+                  <Th>Admin Remarks</Th>
                 </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
+              </thead>
+              <tbody className="bg-white divide-y divide-slate-200">
+                {currentRequests.map(req => (
+                  <tr key={req.id}>
+                    <Td>{new Date(req.requestedAt.seconds * 1000).toLocaleDateString()}</Td>
+                    <Td>₹{req.amount.toLocaleString('en-IN')}</Td>
+                    <Td><StatusBadge status={req.status} /></Td>
+                    <Td>{req.amountPaid ? `₹${req.amountPaid.toLocaleString('en-IN')}` : '-'}</Td>
+                    <Td>{req.remarks || '-'}</Td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+          
+          {/* Pagination */}
+          {totalPages > 1 && (
+            <div className="flex justify-between items-center mt-4">
+              <p className="text-sm text-slate-600">
+                Showing {indexOfFirstRequest + 1} to {Math.min(indexOfLastRequest, requests.length)} of {requests.length} requests
+              </p>
+              <div className="flex gap-2">
+                <button
+                  onClick={() => setCurrentPage(prev => Math.max(prev - 1, 1))}
+                  disabled={currentPage === 1}
+                  className="px-3 py-1 bg-slate-200 text-slate-700 rounded hover:bg-slate-300 disabled:opacity-50 disabled:cursor-not-allowed"
+                >
+                  Previous
+                </button>
+                <span className="px-3 py-1 text-slate-700">
+                  Page {currentPage} of {totalPages}
+                </span>
+                <button
+                  onClick={() => setCurrentPage(prev => Math.min(prev + 1, totalPages))}
+                  disabled={currentPage === totalPages}
+                  className="px-3 py-1 bg-slate-200 text-slate-700 rounded hover:bg-slate-300 disabled:opacity-50 disabled:cursor-not-allowed"
+                >
+                  Next
+                </button>
+              </div>
+            </div>
+          )}
+        </>
       )}
     </div>
   );

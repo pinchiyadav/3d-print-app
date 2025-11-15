@@ -25,7 +25,8 @@ import {
   AdminOrdersTab,
   AdminUsersPage,
   AdminRedeemTab,
-  AdminModelsPage
+  AdminModelsPage,
+  AdminManageUserPage
 } from './components/Admin';
 import { OrderModal, RedeemModal, AdminUserModal } from './components/Modals';
 import { LoadingScreen, ErrorMessage } from './components/UI';
@@ -204,6 +205,7 @@ export default function App() {
                 />
               )}
               {page === 'adminUsers' && <AdminUsersPage setModal={setModal} adminFilterOrdersByUser={adminFilterOrdersByUser} />}
+              {page === 'adminManageUser' && <AdminManageUserPage setError={setError} />}
               {page === 'adminRedeem' && <AdminRedeemTab setModal={setModal} />}
               {page === 'adminModels' && <AdminModelsPage />}
             </>
@@ -324,7 +326,14 @@ function Navbar({ user, photographer, navigate, handleSignOut, currentPage, isAd
                 active={currentPage === 'adminUsers'}
                 icon={<UsersIcon />}
               >
-                Manage Users
+                Users
+              </NavItem>
+              <NavItem 
+                onClick={() => navigate('adminManageUser')} 
+                active={currentPage === 'adminManageUser'}
+                icon={<UserIcon />}
+              >
+                Manage User
               </NavItem>
               <NavItem 
                 onClick={() => navigate('adminRedeem')} 
