@@ -125,17 +125,23 @@ export default function PlaceOrderScreen({ navigation }) {
 
     // Validation
     if (!selectedModel) {
-      setError('Please select a 3D model');
+      const errorMsg = 'Please select a 3D model';
+      setError(errorMsg);
+      Alert.alert('Validation Error', errorMsg);
       return;
     }
 
     if (!buyerName || !buyerPhone || !buyerAddress || !buyerPincode) {
-      setError('Please fill in all buyer details');
+      const errorMsg = 'Please fill in all buyer details';
+      setError(errorMsg);
+      Alert.alert('Validation Error', errorMsg);
       return;
     }
 
     if (buyerPhone.length < 10) {
-      setError('Phone number must be at least 10 digits');
+      const errorMsg = 'Phone number must be at least 10 digits';
+      setError(errorMsg);
+      Alert.alert('Validation Error', errorMsg);
       return;
     }
 
@@ -151,9 +157,11 @@ export default function PlaceOrderScreen({ navigation }) {
   };
 
   const submitOrder = async () => {
+    console.log('submitOrder started');
     setSubmitting(true);
 
     try {
+      console.log('Generating order ID...');
       // Generate order ID using transaction
       const orderId = await runTransaction(db, async (transaction) => {
         const userRef = doc(db, USERS_PATH, photographer.uid);
@@ -220,7 +228,9 @@ export default function PlaceOrderScreen({ navigation }) {
       }, 2000);
     } catch (err) {
       console.error('Order submission error:', err);
-      setError(err.message || 'Failed to place order. Please try again.');
+      const errorMsg = err.message || 'Failed to place order. Please try again.';
+      setError(errorMsg);
+      Alert.alert('Error', errorMsg);
     } finally {
       setSubmitting(false);
     }
