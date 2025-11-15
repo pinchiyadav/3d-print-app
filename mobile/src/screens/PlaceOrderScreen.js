@@ -10,6 +10,7 @@ import {
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import * as ImagePicker from 'expo-image-picker';
+import * as DocumentPicker from 'expo-document-picker';
 import { collection, getDocs, addDoc, runTransaction, doc } from 'firebase/firestore';
 import { ref, uploadBytesResumable, getDownloadURL } from 'firebase/storage';
 import { db, storage, MODELS_PATH, ORDERS_PATH, USERS_PATH } from '../services/firebase';
@@ -82,6 +83,34 @@ export default function PlaceOrderScreen({ navigation }) {
     } catch (err) {
       console.error('Error picking images:', err);
       Alert.alert('Error', 'Failed to pick images');
+    }
+  };
+
+  const pickFiles = async () => {
+    try {
+      const result = await DocumentPicker.getDocumentAsync({
+        type: ['image/*'],
+        multiple: true,
+        copyToCacheDirectory: true,
+      });
+
+      if (!result.canceled && result.assets) {
+        const newPhotos = result.assets.map((asset, index) => ({
+          id: Date.now() + index,
+          uri: asset.uri,
+          name: asset.name || `file_${Date.now()}_${index}.jpg`,
+        }));
+
+        if (photos.length + newPhotos.length > 10) {
+          Alert.alert('Limit Exceeded', 'You can upload a maximum of 10 photos');
+          return;
+        }
+
+        setPhotos([...photos, ...newPhotos]);
+      }
+    } catch (err) {
+      console.error('Error picking files:', err);
+      Alert.alert('Error', 'Failed to pick files');
     }
   };
 
@@ -326,10 +355,18 @@ export default function PlaceOrderScreen({ navigation }) {
 
       <View style={styles.section}>
         <Text style={styles.sectionTitle}>Upload Photos (Max 10)</Text>
-        <TouchableOpacity style={styles.uploadButton} onPress={pickImages}>
-          <Ionicons name="camera" size={24} color={colors.primary} />
-          <Text style={styles.uploadButtonText}>Select Photos</Text>
-        </TouchableOpacity>
+
+        <View style={styles.uploadButtonsRow}>
+          <TouchableOpacity style={styles.uploadButtonHalf} onPress={pickImages}>
+            <Ionicons name="images" size={20} color={colors.primary} />
+            <Text style={styles.uploadButtonTextSmall}>From Gallery</Text>
+          </TouchableOpacity>
+
+          <TouchableOpacity style={styles.uploadButtonHalf} onPress={pickFiles}>
+            <Ionicons name="folder-open" size={20} color={colors.primary} />
+            <Text style={styles.uploadButtonTextSmall}>Browse Files</Text>
+          </TouchableOpacity>
+        </View>
 
         <View style={styles.photoGrid}>
           {photos.map((photo) => (
@@ -426,6 +463,29 @@ const styles = StyleSheet.create({
     position: 'absolute',
     top: 8,
     right: 8,
+  },
+  uploadButtonsRow: {
+    flexDirection: 'row',
+    gap: 8,
+    marginBottom: 16,
+  },
+  uploadButtonHalf: {
+    flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: colors.white,
+    padding: 14,
+    borderRadius: 12,
+    borderWidth: 2,
+    borderColor: colors.primary,
+    borderStyle: 'dashed',
+  },
+  uploadButtonTextSmall: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: colors.primary,
+    marginLeft: 6,
   },
   uploadButton: {
     flexDirection: 'row',
