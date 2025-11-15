@@ -23,5 +23,8 @@
     "firebase"
   ],
   "author": "",
-  "license": "ISC"
+  "license": "ISC",
+  "overrides": {
+    "react": "19.1.0"
+  }
 }
