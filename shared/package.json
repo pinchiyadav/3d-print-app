@@ -1,0 +1,16 @@
+{
+  "name": "@3d-print-app/shared",
+  "version": "1.0.0",
+  "description": "Shared code for 3D Print App (web & mobile)",
+  "main": "src/index.js",
+  "private": true,
+  "scripts": {
+    "test": "echo \"No tests yet\""
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "dependencies": {
+    "firebase": "^11.0.2"
+  }
+}
